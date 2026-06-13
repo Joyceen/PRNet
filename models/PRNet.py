@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.smt import smt_t
+from models.gradient_modules import TextureEncoder, GradientInjection, ConvBR
 
 from thop import profile
 from torch import Tensor
@@ -11,16 +12,21 @@ def conv3x3_bn_relu(in_planes, out_planes, k=3, s=1, p=1, b=False):
     return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=k, stride=s, padding=p, bias=b),
             nn.BatchNorm2d(out_planes),
-            # nn.ReLU(inplace=True),
             nn.GELU(),
             )
 
 
 class PRNet(nn.Module):
-    def __init__(self, norm_layer = nn.LayerNorm):
+    def __init__(self, norm_layer = nn.LayerNorm, use_gradient=True):
         super(PRNet, self).__init__()
+        self.use_gradient = use_gradient
 
         self.smt = smt_t()
+
+        if self.use_gradient:
+            self.texture_encoder = TextureEncoder()
+            self.grad_inject_3 = GradientInjection(rgb_ch=128, grad_ch=32, out_ch=128)
+            self.grad_inject_4 = GradientInjection(rgb_ch=64, grad_ch=32, out_ch=64)
         self.up2 = nn.UpsamplingBilinear2d(scale_factor = 2)
         self.up4 = nn.UpsamplingBilinear2d(scale_factor = 4)
 
@@ -82,13 +88,18 @@ class PRNet(nn.Module):
 
 
     def forward(self,x):
-        #print('01', datetime.now())
         rgb_list = self.smt(x)
 
         r1 = rgb_list[3]  # 512,12
         r2 = rgb_list[2]  # 320,24
         r3 = rgb_list[1]  # 128,48
         r4 = rgb_list[0]  # 64,96,96
+
+        if self.use_gradient:
+            xg, _ = self.texture_encoder(x)  # 32ch, stride8
+            # Inject gradient into stride8 and stride4 features
+            r3 = self.grad_inject_3(r3, xg)
+            r4 = self.grad_inject_4(r4, xg)
 
         xf_1 = self.MAM_1(r1)  # 512 12
 
