@@ -1,8 +1,10 @@
+test_maps/
 TrainDataset/
-TestDataset/
 cpts/
 test_maps/
+TestDataset/
 __pycache__/
 *.pyc
 .idea/
-PRNet.zip
+*.pyc
+__pycache__/
