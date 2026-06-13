@@ -153,12 +153,12 @@ logging.info(
         opt.decay_epoch))
 
 # set loss function
-USE_NEW_LOSS = True
+USE_NEW_LOSS = False
 # Phase 1 loss modes:
 # 1 = seg_loss only (edge-weighted BCE + IoU)
 # 2 = seg_loss + l1_ssim (Phase 1 original, too strong)
 # 3 = original BCE + IoU + l1_ssim (add SSIM only)
-LOSS_MODE = 1
+LOSS_MODE = 0
 step = 0
 writer = SummaryWriter(save_path + 'summary')
 best_mae = 1
