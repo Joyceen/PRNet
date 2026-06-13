@@ -161,7 +161,8 @@ class PRNet(nn.Module):
         return y1,y2,y3,y4
 
     def load_pre(self, pre_model):
-        self.smt.load_state_dict(torch.load(pre_model)['model'])
+        ckpt = torch.load(pre_model, map_location='cpu', weights_only=False)
+        self.smt.load_state_dict(ckpt['model'])
         print(f"loading pre_model ${pre_model}")
 
 
