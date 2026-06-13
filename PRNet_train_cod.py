@@ -153,7 +153,12 @@ logging.info(
         opt.decay_epoch))
 
 # set loss function
-USE_NEW_LOSS = True  # Phase 1: toggle between old (BCE+IoU) and new (seg_loss + l1_ssim)
+USE_NEW_LOSS = True
+# Phase 1 loss modes:
+# 1 = seg_loss only (edge-weighted BCE + IoU)
+# 2 = seg_loss + l1_ssim (Phase 1 original, too strong)
+# 3 = original BCE + IoU + l1_ssim (add SSIM only)
+LOSS_MODE = 1
 step = 0
 writer = SummaryWriter(save_path + 'summary')
 best_mae = 1
@@ -178,13 +183,23 @@ def train(train_loader, model, optimizer, epoch, save_path):
             gts = gts.cuda()
             s1, s2, s3, s4 = model(images)
 
-            if USE_NEW_LOSS:
+            CE = torch.nn.BCEWithLogitsLoss()
+            if LOSS_MODE == 1:
+                loss1 = seg_loss(s1, gts)
+                loss2 = seg_loss(s2, gts)
+                loss3 = seg_loss(s3, gts)
+                loss4 = seg_loss(s4, gts)
+            elif LOSS_MODE == 2:
                 loss1 = seg_loss(s1, gts) + l1_ssim_loss(s1, gts)
                 loss2 = seg_loss(s2, gts) + l1_ssim_loss(s2, gts)
                 loss3 = seg_loss(s3, gts) + l1_ssim_loss(s3, gts)
                 loss4 = seg_loss(s4, gts) + l1_ssim_loss(s4, gts)
+            elif LOSS_MODE == 3:
+                loss1 = CE(s1, gts) + iou_loss(s1, gts) + l1_ssim_loss(s1, gts)
+                loss2 = CE(s2, gts) + iou_loss(s2, gts) + l1_ssim_loss(s2, gts)
+                loss3 = CE(s3, gts) + iou_loss(s3, gts) + l1_ssim_loss(s3, gts)
+                loss4 = CE(s4, gts) + iou_loss(s4, gts) + l1_ssim_loss(s4, gts)
             else:
-                CE = torch.nn.BCEWithLogitsLoss()
                 loss1 = CE(s1, gts) + iou_loss(s1, gts)
                 loss2 = CE(s2, gts) + iou_loss(s2, gts)
                 loss3 = CE(s3, gts) + iou_loss(s3, gts)
