@@ -96,12 +96,6 @@ class PRNet(nn.Module):
         r3 = rgb_list[1]  # 128,48
         r4 = rgb_list[0]  # 64,96,96
 
-        if self.use_gradient:
-            xg, _ = self.texture_encoder(x)  # 32ch, stride8
-            # Inject gradient into stride8 and stride4 features
-            r3 = self.grad_inject_3(r3, xg)
-            r4 = self.grad_inject_4(r4, xg)
-
         xf_1 = self.MAM_1(r1)  # 512 12
         if self.use_freq_gate:
             xf_1 = self.freq_gate_1(xf_1)
