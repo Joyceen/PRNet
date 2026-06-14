@@ -1,0 +1,2 @@
+#iteration	experiment	CAMO_MAE	COD10K_MAE	NC4K_MAE	decision	note
+0	baseline (best_epoch.pth)	0.0496	0.0218	0.0357	keep	原始 PRNet 复现权重

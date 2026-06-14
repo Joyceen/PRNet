@@ -1,8 +1,26 @@
-"""Gradient-guided modules from DGNet for PRNet integration."""
+"""Extra modules for PRNet experiments."""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+class FreqGate(nn.Module):
+    """Frequency-domain gate: FFT → learned gating → IFFT."""
+    def __init__(self, channels):
+        super().__init__()
+        self.gate = nn.Sequential(
+            nn.Conv2d(channels, max(8, channels // 16), 1, bias=True),
+            nn.BatchNorm2d(max(8, channels // 16)),
+            nn.ReLU(True),
+            nn.Conv2d(max(8, channels // 16), channels, 1, bias=True),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        x_fft = torch.fft.fft2(x.float())
+        gate = self.gate(x_fft.real)
+        x_filtered = torch.abs(torch.fft.ifft2(gate * x_fft))
+        return x + x_filtered
 
 class ConvBR(nn.Module):
     def __init__(self, in_ch, out_ch, k=3, s=1, p=1):
@@ -16,7 +34,6 @@ class ConvBR(nn.Module):
 
 
 class TextureEncoder(nn.Module):
-    """Lightweight gradient branch from DGNet."""
     def __init__(self):
         super().__init__()
         self.conv1 = ConvBR(3, 64, k=7, s=2, p=3)
@@ -29,11 +46,10 @@ class TextureEncoder(nn.Module):
         feat = self.conv2(feat)
         feat = self.conv3(feat)
         pg = self.conv_out(feat)
-        return feat, pg  # xg (32ch, stride8), pg (1ch, stride8)
+        return feat, pg
 
 
 class GradientInjection(nn.Module):
-    """Fuse gradient features with RGB features: concat + conv."""
     def __init__(self, rgb_ch, grad_ch=32, out_ch=64):
         super().__init__()
         self.fuse = ConvBR(rgb_ch + grad_ch, out_ch, k=3, s=1, p=1)

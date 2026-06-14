@@ -1,0 +1,24 @@
+{
+  "goal": "Improve PRNet COD performance below baseline (CAMO MAE 0.0496)",
+  "metric": "CAMO MAE",
+  "direction": "lower",
+  "verify": "cd /root/workspace/PRNet && /root/miniconda3/envs/PRNet/bin/python tools/evaluate.py --pred_root ./test_maps/PRNet/ --gt_root ./TestDataset/ --datasets CAMO",
+  "guard": "COD10K CAM MAE < 0.024",
+  "baseline": {
+    "CAMO": {"MAE": 0.0496, "maxFm": 0.9138, "Sm": 0.9196},
+    "COD10K": {"MAE": 0.0218, "maxFm": 0.8845, "Sm": 0.9189},
+    "NC4K": {"MAE": 0.0357, "maxFm": 0.9190, "Sm": 0.9215}
+  },
+  "iterations": [
+    {
+      "id": 1,
+      "experiment": "Phase 2 v2: DGNet gradient branch + BCE+IoU loss",
+      "best_CAMO_MAE": 0.0602,
+      "converged_MAE_range": "0.067-0.071",
+      "decision": "discard",
+      "note": "梯度分支未带来提升，best 0.0602 > baseline 0.0496，epoch 4后就发散"
+    }
+  ],
+  "status": "planning_next",
+  "stopped_at": "2026-06-14T01:50:00+08:00"
+}

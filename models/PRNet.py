@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.smt import smt_t
-from models.gradient_modules import TextureEncoder, GradientInjection, ConvBR
+from models.modules_ext import FreqGate
 
 from thop import profile
 from torch import Tensor
@@ -17,16 +17,11 @@ def conv3x3_bn_relu(in_planes, out_planes, k=3, s=1, p=1, b=False):
 
 
 class PRNet(nn.Module):
-    def __init__(self, norm_layer = nn.LayerNorm, use_gradient=True):
+    def __init__(self, norm_layer = nn.LayerNorm, use_freq_gate=True):
         super(PRNet, self).__init__()
-        self.use_gradient = use_gradient
+        self.use_freq_gate = use_freq_gate
 
         self.smt = smt_t()
-
-        if self.use_gradient:
-            self.texture_encoder = TextureEncoder()
-            self.grad_inject_3 = GradientInjection(rgb_ch=128, grad_ch=32, out_ch=128)
-            self.grad_inject_4 = GradientInjection(rgb_ch=64, grad_ch=32, out_ch=64)
         self.up2 = nn.UpsamplingBilinear2d(scale_factor = 2)
         self.up4 = nn.UpsamplingBilinear2d(scale_factor = 4)
 
@@ -34,6 +29,12 @@ class PRNet(nn.Module):
         self.MAM_2 = CoordAtt(256, 256)
         self.MAM_3 = CoordAtt(128, 128)
         self.MAM_4 = CoordAtt(64, 64)
+
+        if self.use_freq_gate:
+            self.freq_gate_1 = FreqGate(512)
+            self.freq_gate_2 = FreqGate(256)
+            self.freq_gate_3 = FreqGate(128)
+            self.freq_gate_4 = FreqGate(64)
 
         self.PCM1 = MLPBlock(dim=64)
         self.PCM2 = MLPBlock(dim=64)
@@ -102,6 +103,8 @@ class PRNet(nn.Module):
             r4 = self.grad_inject_4(r4, xg)
 
         xf_1 = self.MAM_1(r1)  # 512 12
+        if self.use_freq_gate:
+            xf_1 = self.freq_gate_1(xf_1)
 
         r1_up = F.interpolate(self.dwc1(xf_1), size=24, mode='bilinear')
         r1_up, _ = torch.split(r1_up, [128, 128], dim=1)
@@ -109,6 +112,8 @@ class PRNet(nn.Module):
         r2_con = torch.cat((r2, r1_up), 1)
         r2_con = self.dwcon_2(r2_con)
         xf_2 = self.MAM_2(r2_con)  # 320 24
+        if self.use_freq_gate:
+            xf_2 = self.freq_gate_2(xf_2)
 
         r2_up = F.interpolate(self.dwc2(xf_2), size=48, mode='bilinear')
         r2_up, _ = torch.split(r2_up, [64, 64], dim=1)
@@ -116,6 +121,8 @@ class PRNet(nn.Module):
         r3_con = torch.cat((r3, r2_up), 1)
         r3_con = self.dwcon_3(r3_con)
         xf_3 = self.MAM_3(r3_con)  # 128 48
+        if self.use_freq_gate:
+            xf_3 = self.freq_gate_3(xf_3)
 
         r3_up = F.interpolate(self.dwc3(xf_3), size=96, mode='bilinear')
         r3_up, _ = torch.split(r3_up, [32, 32], dim=1)
@@ -123,6 +130,8 @@ class PRNet(nn.Module):
         r4_con = torch.cat((r4, r3_up), 1)
         r4_con = self.dwcon_4(r4_con)
         xf_4 = self.MAM_4(r4_con)  # 64 96
+        if self.use_freq_gate:
+            xf_4 = self.freq_gate_4(xf_4)
 
         xf_11 = self.xf_11(xf_1)
         xf_12 = F.interpolate(self.xf_12(xf_1), size=24, mode='bilinear')
